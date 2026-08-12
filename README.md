@@ -24,6 +24,8 @@ The experiment deliberately begins without agents, RAG, external LLMs, persisten
 - shared trainable byte encoder for Text and IR
 - recurrent workspace controller with fixed parameter count across reasoning cycles
 - parameter-free sinusoidal positions for message-length OOD evaluation
+- IID-only graph `NEXT_STEP` answer head
+- online supervised Text/IR graph training harness with separate evaluation seeds
 
 ### Neural baseline
 
@@ -51,6 +53,14 @@ Default neural configuration:
 
 Reasoning cycles are a runtime compute budget. The same controller blocks are reused on every cycle, so requesting more reasoning does not add parameters.
 
+### Current supervised graph harness
+
+The first trainer targets fixed-size IID graph `NEXT_STEP` problems for both Text and structured IR. It generates tasks online, derives labels from the graph oracle, and evaluates on a separate frozen seed range.
+
+The current fixed-class graph head is intentionally **not** valid for OOD entity-count claims because output classes are tied to the training entity IDs. A candidate/pointer-style output mechanism must replace it before size-scaling evaluation.
+
+A short CPU sanity run established that the full training path executes and gradients update the model, but it did not establish reliable task learning yet. The trainer is therefore a harness, not a benchmark result.
+
 ### Run tests
 
 ```bash
@@ -63,7 +73,7 @@ python -m pytest
 python -m ai_reasoning.eval.smoke --episodes 10000
 ```
 
-The smoke benchmark validates that generated tasks are solvable and that oracle answers satisfy the canonical task definition. It does not train a neural model yet.
+The smoke benchmark validates that generated tasks are solvable and that oracle answers satisfy the canonical task definition.
 
 ## Experimental controls
 
@@ -71,4 +81,4 @@ Every protocol receives the same generated task. The task is created once from a
 
 Text and structured IR also share the exact same trainable byte-encoder and recurrent-controller architecture. Their input sequences differ, but neither path receives privileged task metadata.
 
-The next implementation milestone is the supervised answer heads and training harness for Text and structured IR. Once both baselines reliably learn the IID tasks, the learned discrete machine-native protocol can be introduced against a functioning neural benchmark.
+The next implementation milestone is to make both graph baselines learn reliably, add frozen evaluation reporting, and replace the IID-only output head with an OOD-safe candidate mechanism before introducing the learned discrete machine-native protocol.
