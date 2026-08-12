@@ -21,6 +21,35 @@ The experiment deliberately begins without agents, RAG, external LLMs, persisten
 - learned-protocol channel specification (256 symbols, 8 bits/symbol)
 - entity-renaming utilities for invariance tests
 - 10,000-episode deterministic smoke benchmark
+- shared trainable byte encoder for Text and IR
+- recurrent workspace controller with fixed parameter count across reasoning cycles
+- parameter-free sinusoidal positions for message-length OOD evaluation
+
+### Neural baseline
+
+Text and structured IR now use the same neural path:
+
+```text
+protocol bytes
+    -> shared ByteMessageEncoder architecture
+    -> machine-native message states
+    -> recurrent workspace controller
+    -> workspace state
+```
+
+The controller never receives the canonical `Task`, task-family metadata, entity count, oracle state, or any other shortcut. The byte message is the information boundary.
+
+Default neural configuration:
+
+- `d_model=256`
+- 2 message-encoder Transformer layers
+- 16 workspace slots
+- 2 reasoning blocks per cycle
+- 8 attention heads
+- FFN width 1024
+- ~3.76M trainable parameters before answer heads
+
+Reasoning cycles are a runtime compute budget. The same controller blocks are reused on every cycle, so requesting more reasoning does not add parameters.
 
 ### Run tests
 
@@ -38,6 +67,8 @@ The smoke benchmark validates that generated tasks are solvable and that oracle 
 
 ## Experimental controls
 
-Every protocol will receive the same generated task. The task is created once from a seed and only the representation changes. Training and evaluation seeds will be separated, entity IDs are randomized, relation ordering is randomized, and renaming entities must not change correctness.
+Every protocol receives the same generated task. The task is created once from a seed and only the representation changes. Training and evaluation seeds are separated, entity IDs are randomized, relation ordering is randomized, and renaming entities must not change correctness.
 
-The next implementation milestone is the shared recurrent reasoning controller and the three trainable protocol paths: text, structured IR, and learned discrete machine-native communication.
+Text and structured IR also share the exact same trainable byte-encoder and recurrent-controller architecture. Their input sequences differ, but neither path receives privileged task metadata.
+
+The next implementation milestone is the supervised answer heads and training harness for Text and structured IR. Once both baselines reliably learn the IID tasks, the learned discrete machine-native protocol can be introduced against a functioning neural benchmark.
